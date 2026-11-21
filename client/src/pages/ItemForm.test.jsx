@@ -44,6 +44,44 @@ describe('ItemForm — report mode (/items/new)', () => {
     expect(category).toHaveValue('other')
   })
 
-  test.todo('submitting POSTs { title, status, category, location, description } (no reportedBy) and navigates to /items')
-  test.todo('shows the server\'s message when the request fails (e.g. 409) and stays on the page')
+  test('submits the five editable fields and navigates to /items', async () => {
+    api.post.mockResolvedValueOnce({ data: { item: {} } })
+    const user = userEvent.setup()
+    renderAt('/items/new')
+
+    const report = {
+      title: 'Blue jacket',
+      status: 'found',
+      category: 'clothing',
+      location: 'Library',
+      description: 'Left on a chair'
+    }
+
+    const [status, category] = screen.getAllByRole('combobox')
+    await user.type(screen.getByPlaceholderText(/title/i), report.title)
+    await user.selectOptions(status, report.status)
+    await user.selectOptions(category, report.category)
+    await user.type(screen.getByPlaceholderText(/location/i), report.location)
+    await user.type(screen.getByPlaceholderText(/description/i), report.description)
+    await user.click(screen.getByRole('button', { name: /save/i }))
+
+    expect(api.post).toHaveBeenCalledTimes(1)
+    expect(api.post.mock.calls[0]).toStrictEqual(['/items', report])
+    expect(await screen.findByText('Items page')).toBeInTheDocument()
+  })
+
+  test('shows the server’s message when saving fails and stays on the report page', async () => {
+    const message = 'Duplicate item at this location'
+    api.post.mockRejectedValueOnce({ response: { data: { message } } })
+    const user = userEvent.setup()
+    renderAt('/items/new')
+
+    await user.type(screen.getByPlaceholderText(/title/i), 'Black backpack')
+    await user.type(screen.getByPlaceholderText(/location/i), 'Library')
+    await user.click(screen.getByRole('button', { name: /save/i }))
+
+    expect(await screen.findByText(message)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /report item/i })).toBeInTheDocument()
+    expect(screen.queryByText('Items page')).not.toBeInTheDocument()
+  })
 })
